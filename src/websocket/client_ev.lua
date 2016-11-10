@@ -118,19 +118,30 @@ local ev = function(ws)
     sock = socket.tcp()
     fd = sock:getfd()
     assert(fd > -1)
-    -- set non blocking
-    sock:settimeout(0)
+    -- settimeout to 1 is very important for SSl/TLS in this case
+    -- if this doesn't work all the time I'll have to possibly bump it up, which may start blocking
+    sock:settimeout(1)
     sock:setoption('tcp-nodelay',true)
     local protocol,host,port,uri = tools.parse_url(url)
+    if not secure_params then
+      on_error('no secure parameters were provided with "wss" being true')
+      return 
+    end
     local connected,err = sock:connect(host,port)
+    if err then
+      on_error('could not connect')
+      return
+    end
     if protocol == 'wss' then
+      print(sock, secure_params)
       sock = ssl.wrap(sock, secure_params)
       sock:dohandshake()
       
-      -- We have to re-initialize values that were set previously because it's a new socket
+      -- We have to re-initialize values that were set previously because it's a "new socket"
       sock:settimeout(0)
     elseif protocol ~= "ws" then
       on_error('bad protocol')
+      sock:close();
       return
     end
     local ws_protocols_tbl = {''}
